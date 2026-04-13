@@ -3,7 +3,6 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Header from "@/app/Display/Header";
-import seedStaff from "@/app/data/staff.json";
 
 type StaffMember = {
   id: string;
@@ -23,8 +22,6 @@ type StaffForm = {
   monthlySalary: string;
 };
 
-const STORAGE_KEY = "barracks.staff.records";
-
 const emptyForm: StaffForm = {
   name: "",
   role: "",
@@ -33,54 +30,8 @@ const emptyForm: StaffForm = {
   monthlySalary: "",
 };
 
-const fallbackStaff: StaffMember[] = (seedStaff as StaffMember[]).map((staff) => ({ ...staff }));
-
-const isValidStaff = (value: unknown): value is StaffMember => {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-
-  const member = value as Record<string, unknown>;
-
-  return (
-    typeof member.id === "string" &&
-    typeof member.name === "string" &&
-    typeof member.role === "string" &&
-    typeof member.email === "string" &&
-    typeof member.contactNumber === "string" &&
-    typeof member.monthlySalary === "number" &&
-    typeof member.createdAt === "string"
-  );
-};
-
-const getInitialStaff = (): StaffMember[] => {
-  if (typeof window === "undefined") {
-    return fallbackStaff;
-  }
-
-  const storedRecords = window.localStorage.getItem(STORAGE_KEY);
-
-  if (!storedRecords) {
-    return fallbackStaff;
-  }
-
-  try {
-    const parsed = JSON.parse(storedRecords) as unknown;
-
-    if (Array.isArray(parsed) && parsed.every(isValidStaff)) {
-      return parsed;
-    }
-
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(fallbackStaff));
-    return fallbackStaff;
-  } catch {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(fallbackStaff));
-    return fallbackStaff;
-  }
-};
-
 export default function StaffRecordsPage() {
-  const [staff, setStaff] = useState<StaffMember[]>(() => getInitialStaff());
+  const [staff, setStaff] = useState<StaffMember[]>([]);
   const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
   const [editingStaffId, setEditingStaffId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -88,10 +39,27 @@ export default function StaffRecordsPage() {
   const [sortBy, setSortBy] = useState<"name-asc" | "salary-high" | "salary-low">("name-asc");
   const [formData, setFormData] = useState<StaffForm>(emptyForm);
   const [formError, setFormError] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(staff));
-  }, [staff]);
+    async function loadStaff() {
+      try {
+        const response = await fetch("/api/staff", { cache: "no-store" });
+        if (!response.ok) {
+          throw new Error("Failed to load staff.");
+        }
+
+        const data = (await response.json()) as StaffMember[];
+        setStaff(data);
+      } catch {
+        setFormError("Could not load staff records.");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    void loadStaff();
+  }, []);
 
   const persistStaff = (updatedStaff: StaffMember[]) => {
     setStaff(updatedStaff);
@@ -126,7 +94,7 @@ export default function StaffRecordsPage() {
 
   const selectedStaff = staff.find((member) => member.id === selectedStaffId) ?? staff[0] ?? null;
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     const trimmedName = formData.name.trim();
@@ -184,20 +152,35 @@ export default function StaffRecordsPage() {
       return;
     }
 
-    const newStaff: StaffMember = {
-      id: `staff-${Date.now()}`,
-      name: trimmedName,
-      role: trimmedRole,
-      email: trimmedEmail,
-      contactNumber: trimmedContactNumber,
-      monthlySalary: salary,
-      createdAt: new Date().toISOString(),
-    };
+    try {
+      const response = await fetch("/api/staff", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: trimmedName,
+          role: trimmedRole,
+          email: trimmedEmail,
+          contactNumber: trimmedContactNumber,
+          monthlySalary: salary,
+        }),
+      });
 
-    const updatedStaff = [newStaff, ...staff];
-    persistStaff(updatedStaff);
-    setSelectedStaffId(newStaff.id);
-    setFormData(emptyForm);
+      const data = (await response.json()) as StaffMember | { message?: string };
+
+      if (!response.ok) {
+        setFormError((data as { message?: string }).message ?? "Could not create staff record.");
+        return;
+      }
+
+      const createdStaff = data as StaffMember;
+      persistStaff([createdStaff, ...staff]);
+      setSelectedStaffId(createdStaff.id);
+      setFormData(emptyForm);
+    } catch {
+      setFormError("Could not create staff record.");
+    }
   };
 
   const startEdit = (member: StaffMember) => {
@@ -291,7 +274,9 @@ export default function StaffRecordsPage() {
           <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
             <section className="rounded-2xl border border-white/15 bg-black/45 p-5 backdrop-blur-sm">
               <h2 className="text-xl font-semibold">Record List View</h2>
-              <p className="mt-1 text-sm text-white/70">{filteredStaff.length} staff record(s)</p>
+              <p className="mt-1 text-sm text-white/70">
+                {isLoading ? "Loading staff records..." : `${filteredStaff.length} staff record(s)`}
+              </p>
 
               <div className="mt-4 space-y-3">
                 {filteredStaff.map((member) => (

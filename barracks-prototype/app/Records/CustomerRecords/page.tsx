@@ -3,7 +3,6 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Header from "@/app/Display/Header";
-import seedCustomers from "@/app/data/customers.json";
 
 type Customer = {
   id: string;
@@ -19,72 +18,41 @@ type CustomerForm = {
   contactNumber: string;
 };
 
-const STORAGE_KEY = "barracks.customers.records";
-
 const emptyForm: CustomerForm = {
   name: "",
   email: "",
   contactNumber: "",
 };
 
-const fallbackCustomers: Customer[] = (seedCustomers as Customer[]).map((customer) => ({
-  ...customer,
-}));
-
-const isValidCustomer = (value: unknown): value is Customer => {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-
-  const customer = value as Record<string, unknown>;
-
-  return (
-    typeof customer.id === "string" &&
-    typeof customer.name === "string" &&
-    typeof customer.email === "string" &&
-    typeof customer.contactNumber === "string" &&
-    typeof customer.createdAt === "string"
-  );
-};
-
-const getInitialCustomers = (): Customer[] => {
-  if (typeof window === "undefined") {
-    return fallbackCustomers;
-  }
-
-  const storedRecords = window.localStorage.getItem(STORAGE_KEY);
-
-  if (!storedRecords) {
-    return fallbackCustomers;
-  }
-
-  try {
-    const parsed = JSON.parse(storedRecords) as unknown;
-
-    if (Array.isArray(parsed) && parsed.every(isValidCustomer)) {
-      return parsed;
-    }
-
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(fallbackCustomers));
-    return fallbackCustomers;
-  } catch {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(fallbackCustomers));
-    return fallbackCustomers;
-  }
-};
-
 export default function CustomerRecordsPage() {
-  const [customers, setCustomers] = useState<Customer[]>(() => getInitialCustomers());
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<"name-asc" | "name-desc" | "recent">("name-asc");
   const [formData, setFormData] = useState<CustomerForm>(emptyForm);
   const [formError, setFormError] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(customers));
-  }, [customers]);
+    async function loadCustomers() {
+      try {
+        const response = await fetch("/api/customers", { cache: "no-store" });
+        if (!response.ok) {
+          throw new Error("Failed to load customers.");
+        }
+
+        const data = (await response.json()) as Customer[];
+        setCustomers(data);
+      } catch {
+        setFormError("Could not load customer records.");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    void loadCustomers();
+  }, []);
 
   const persistCustomers = (updatedCustomers: Customer[]) => {
     setCustomers(updatedCustomers);
@@ -113,7 +81,7 @@ export default function CustomerRecordsPage() {
   const selectedCustomer =
     customers.find((customer) => customer.id === selectedCustomerId) ?? customers[0] ?? null;
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     const trimmedName = formData.name.trim();
@@ -156,18 +124,33 @@ export default function CustomerRecordsPage() {
       return;
     }
 
-    const newCustomer: Customer = {
-      id: `cust-${Date.now()}`,
-      name: trimmedName,
-      email: trimmedEmail,
-      contactNumber: trimmedContactNumber,
-      createdAt: new Date().toISOString(),
-    };
+    try {
+      const response = await fetch("/api/customers", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: trimmedName,
+          email: trimmedEmail,
+          contactNumber: trimmedContactNumber,
+        }),
+      });
 
-    const updatedCustomers = [newCustomer, ...customers];
-    persistCustomers(updatedCustomers);
-    setSelectedCustomerId(newCustomer.id);
-    setFormData(emptyForm);
+      const data = (await response.json()) as Customer | { message?: string };
+
+      if (!response.ok) {
+        setFormError((data as { message?: string }).message ?? "Could not create customer.");
+        return;
+      }
+
+      const createdCustomer = data as Customer;
+      persistCustomers([createdCustomer, ...customers]);
+      setSelectedCustomerId(createdCustomer.id);
+      setFormData(emptyForm);
+    } catch {
+      setFormError("Could not create customer.");
+    }
   };
 
   const startEdit = (customer: Customer) => {
@@ -247,7 +230,9 @@ export default function CustomerRecordsPage() {
           <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
             <section className="rounded-2xl border border-white/15 bg-black/45 p-5 backdrop-blur-sm">
               <h2 className="text-xl font-semibold">Record List View</h2>
-              <p className="mt-1 text-sm text-white/70">{filteredCustomers.length} customer record(s)</p>
+              <p className="mt-1 text-sm text-white/70">
+                {isLoading ? "Loading customer records..." : `${filteredCustomers.length} customer record(s)`}
+              </p>
 
               <div className="mt-4 space-y-3">
                 {filteredCustomers.map((customer) => (
