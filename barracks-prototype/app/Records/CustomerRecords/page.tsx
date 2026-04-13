@@ -244,7 +244,7 @@ export default function CustomerRecordsPage() {
             </div>
           </section>
 
-          <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
+          <main className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
             <section className="rounded-2xl border border-white/15 bg-black/45 p-5 backdrop-blur-sm">
               <h2 className="text-xl font-semibold">Record List View</h2>
               <p className="mt-1 text-sm text-white/70">{filteredCustomers.length} customer record(s)</p>
@@ -380,32 +380,64 @@ export default function CustomerRecordsPage() {
                     <p>
                       <span className="font-semibold text-white/85">Record ID:</span> {selectedCustomer.id}
                     </p>
-                    <p>
-                      <span className="font-semibold text-white/85">Created At:</span>{" "}
-                      {new Date(selectedCustomer.createdAt).toLocaleString()}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => deleteCustomer(selectedCustomer.id)}
-                      className="mt-2 rounded-md bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-600"
-                    >
-                      Delete This Customer
-                    </button>
                   </div>
                 ) : (
-                  <p className="mt-3 text-sm text-white/70">Select a customer to view full info.</p>
+                  <p className="mt-3 text-sm text-white/60">Select a customer to view details.</p>
                 )}
               </article>
             </section>
-          </div>
-        </div>
-
-        <div className="mx-auto max-w-6xl px-4 pb-8 md:px-8">
-          <Link href="/Display/LandingPage" className="text-sm text-white/80 hover:text-white">
-            Back to Dashboard
-          </Link>
+          </main>
         </div>
       </div>
     </>
   );
 }
+
+/*
+
+// NEW UNIFIED INTERFACE - PeerReview branch implementation
+import PageInterface from "../PageInterface";
+import { Network } from "lucide-react";
+
+const sampleCustomers = [
+  {
+    "id": "cust-1001",
+    "name": "Alyssa Rivera",
+    "email": "alyssa.rivera@email.com",
+    "contactNumber": "+63 917 555 0111",
+    "createdAt": "2026-01-18T10:22:00.000Z"
+  },
+  {
+    "id": "cust-1002",
+    "name": "Marc Tan",
+    "email": "marc.tan@email.com",
+    "contactNumber": "+63 917 555 0142",
+    "createdAt": "2026-02-04T13:45:00.000Z"
+  },
+  {
+    "id": "cust-1003",
+    "name": "Jessa Lim",
+    "email": "jessa.lim@email.com",
+    "contactNumber": "+63 917 555 0188",
+    "createdAt": "2026-03-01T08:10:00.000Z"
+  }
+];
+
+export default function CustomerRecordsPage() {
+  return (
+    <PageInterface
+      title="Customer Records"
+      description="Browse, search, and manage all customer records"
+      icon={<Network size={24} />}
+      color="pink"
+      records={sampleCustomers}
+      totalLabel="All Items"
+      onAdd={() => console.log("Add item")}
+      onView={(id) => console.log("View item", id)}
+      onEdit={(id) => console.log("Edit item", id)}
+      onDelete={(id) => console.log("Delete item", id)}
+    />
+  );
+}
+
+*/

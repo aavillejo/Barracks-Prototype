@@ -1,38 +1,35 @@
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faUser } from '@fortawesome/free-solid-svg-icons'
+import { User, Network, Package, UserRound } from 'lucide-react'
 import Link from 'next/link'
 
 export default function Header() {
     return (
         <header className="flex flex-row justify-between items-center p-4 bg-gray-800 sticky top-0 z-10">
-            <div className="flex flex-row items-center mx-4 gap-8">
-                <Link href="/Records/CustomerRecords">
+            <div className="flex flex-row items-center gap-8">
+                <img src="/barracks1200x700.png" alt="Logo" className="h-10 w-10 rounded-lg brightness-0 invert" /> {/* Lowk can't make the invert trick work */}
+                <Link href="/Records/CustomerRecords" className="flex flex-row gap-2">
+                    <User style={{color: "white"}} />
                     <h2 className="text-white hover:scale-110 hover:font-bold transition-transform cursor-pointer">
                         Customer Records
                     </h2>
                 </Link>
-                <Link href="/Records/StaffRecords">
+                <Link href="/Records/StaffRecords" className="flex flex-row gap-2">
+                    <Network style={{color: "white"}} />
                     <h2 className="text-white hover:scale-110 hover:font-bold transition-transform cursor-pointer">
                         Staff Records
                     </h2>
                 </Link>
                 
-                {/* Fixed the path here to match: Records/InventoryPage */}
-                <Link href="/Records/InventoryPage">
+                <Link href="/Records/InventoryPage" className="flex flex-row gap-2">
+                    <Package style={{color: "white"}} />
                     <h2 className="text-white hover:scale-110 hover:font-bold transition-transform cursor-pointer">
                         Inventory
                     </h2>
                 </Link>
             </div>
 
-            <div className="flex flex-row items-center gap-4">
-                <span className="px-4 py-2 mx-4 rounded-lg bg-gray-700 text-white text-sm">
-                    Records Management
-                </span>
-            </div>
-
-            <div className="items-center mx-8 hover:scale-125 transition-transform cursor-pointer"> 
-                <FontAwesomeIcon icon={faUser} style={{color: "white"}}/> 
+            <div className="flex flex-row items-center gap-2">
+                <input type="text" className="px-4 py-2 mx-4 rounded-lg bg-gray-700 text-white text-sm" placeholder="Search" />
+                <UserRound style={{color: "white"}} />
             </div>
         </header>
     )

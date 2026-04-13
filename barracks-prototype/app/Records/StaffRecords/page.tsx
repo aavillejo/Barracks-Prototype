@@ -492,3 +492,32 @@ export default function StaffRecordsPage() {
     </>
   );
 }
+
+/*
+// NEW UNIFIED INTERFACE - PeerReview branch implementation
+import PageInterface from "../PageInterface";
+import { Network } from "lucide-react";
+
+const sampleStaff = [
+  { id: "1", name: "Daniel Cruz", subtitle1: "Barber", subtitle2: "daniel@barracks.com" },
+  { id: "2", name: "Maria Santos", subtitle1: "Cashier", subtitle2: "maria@barracks.com" },
+  { id: "3", name: "John Reyes", subtitle1: "Manager", subtitle2: "john@barracks.com" },
+];
+
+export default function StaffRecordsPage() {
+  return (
+    <PageInterface
+      title="Staff"
+      description="Browse, search, and manage all staff records"
+      icon={<Network size={24} />}
+      color="green"
+      records={sampleStaff}
+      totalLabel="All Staff"
+      onAdd={() => console.log("Add staff")}
+      onView={(id) => console.log("View staff", id)}
+      onEdit={(id) => console.log("Edit staff", id)}
+      onDelete={(id) => console.log("Delete staff", id)}
+    />
+  );
+}
+*/
