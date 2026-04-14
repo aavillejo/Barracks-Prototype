@@ -1,36 +1,57 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Barracks Prototype
 
-## Getting Started
+A prototype for our upcoming SIA Project, a Barbershop System. This prototype in particular focuses on the admin side of operations.
 
-First, run the development server:
+## Tech Stack
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **Framework**: Next.js 16.2.3 with App Router
+- **Language**: TypeScript 5
+- **Styling**: Tailwind CSS 4
+- **UI Icons**: Lucide React + FontAwesome
+- **State**: React Hooks (useState, useMemo)
+
+## Project Structure
+
+```
+app/
+├── Display/
+│   ├── Card.tsx           # Reusable dashboard cards (main & small)
+│   ├── Header.tsx         # Navigation header component
+│   ├── LandingPage/       # Dashboard landing page
+│   └── LoginPage/         # Authentication entry point
+├── Records/
+│   ├── PageInterface.tsx  # Unified records UI component
+│   ├── CustomerRecords/   # Customer management page
+│   ├── StaffRecords/      # Staff management page
+│   └── InventoryPage/     # Inventory management page
+├── data/                  # Static data files
+├── globals.css            # Global styles
+├── layout.tsx             # Root layout
+└── page.tsx               # Entry point (Login)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Features
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Current Pages
 
-## Learn More
+| Page | Route | Description |
+|------|-------|-------------|
+| Login | `/` | Authentication entry point |
+| Dashboard | `/Display/LandingPage` | Main dashboard with overview cards |
+| Customer Records | `/Records/CustomerRecords` | Browse, search, manage customers |
+| Staff Records | `/Records/StaffRecords` | Browse, search, manage staff |
+| Inventory | `/Records/InventoryPage` | Browse, search, manage inventory |
 
-To learn more about Next.js, take a look at the following resources:
+### Dashboard Cards
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- **Customer Records** - Total records count + recent activity
+- **Staff Records** - Staff count + recent hires
+- **Inventory** - Total items + low stock alerts
+- **Analytics** - Revenue metrics and trends
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Recent Implementations
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- All Frontend Pages except for Inventory
+- Minimalist and Cleaner concept for Record Pages.
+- localStorage Addition

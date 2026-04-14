@@ -219,3 +219,86 @@ export default function PageInterface({
     </>
   );
 }
+
+/* ============ Holding the Prototypes ================= */
+
+/* ===================
+Customer Records
+
+// NEW UNIFIED INTERFACE - PeerReview branch implementation
+import PageInterface from "../PageInterface";
+import { Network } from "lucide-react";
+
+const sampleCustomers = [
+  {
+    "id": "cust-1001",
+    "name": "Alyssa Rivera",
+    "email": "alyssa.rivera@email.com",
+    "contactNumber": "+63 917 555 0111",
+    "createdAt": "2026-01-18T10:22:00.000Z"
+  },
+  {
+    "id": "cust-1002",
+    "name": "Marc Tan",
+    "email": "marc.tan@email.com",
+    "contactNumber": "+63 917 555 0142",
+    "createdAt": "2026-02-04T13:45:00.000Z"
+  },
+  {
+    "id": "cust-1003",
+    "name": "Jessa Lim",
+    "email": "jessa.lim@email.com",
+    "contactNumber": "+63 917 555 0188",
+    "createdAt": "2026-03-01T08:10:00.000Z"
+  }
+];
+
+export default function CustomerRecordsPage() {
+  return (
+    <PageInterface
+      title="Customer Records"
+      description="Browse, search, and manage all customer records"
+      icon={<Network size={24} />}
+      color="pink"
+      records={sampleCustomers}
+      totalLabel="All Items"
+      onAdd={() => console.log("Add item")}
+      onView={(id) => console.log("View item", id)}
+      onEdit={(id) => console.log("Edit item", id)}
+      onDelete={(id) => console.log("Delete item", id)}
+    />
+  );
+} ===================
+*/
+
+/* 
+================ 
+Staff Records 
+// NEW UNIFIED INTERFACE - PeerReview branch implementation
+import PageInterface from "../PageInterface";
+import { Network } from "lucide-react";
+
+const sampleStaff = [
+  { id: "1", name: "Daniel Cruz", subtitle1: "Barber", subtitle2: "daniel@barracks.com" },
+  { id: "2", name: "Maria Santos", subtitle1: "Cashier", subtitle2: "maria@barracks.com" },
+  { id: "3", name: "John Reyes", subtitle1: "Manager", subtitle2: "john@barracks.com" },
+];
+
+export default function StaffRecordsPage() {
+  return (
+    <PageInterface
+      title="Staff"
+      description="Browse, search, and manage all staff records"
+      icon={<Network size={24} />}
+      color="green"
+      records={sampleStaff}
+      totalLabel="All Staff"
+      onAdd={() => console.log("Add staff")}
+      onView={(id) => console.log("View staff", id)}
+      onEdit={(id) => console.log("Edit staff", id)}
+      onDelete={(id) => console.log("Delete staff", id)}
+    />
+  );
+} ==================
+*/
+
