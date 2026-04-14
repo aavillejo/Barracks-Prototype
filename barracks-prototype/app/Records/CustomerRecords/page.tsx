@@ -1,17 +1,9 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import Link from "next/link";
 import Header from "@/app/Display/Header";
-import seedCustomers from "@/app/data/customers.json";
-
-type Customer = {
-  id: string;
-  name: string;
-  email: string;
-  contactNumber: string;
-  createdAt: string;
-};
+import { useCustomerStorage, type Customer } from "@/app/Records/DataPersistence/Storage";
 
 type CustomerForm = {
   name: string;
@@ -19,76 +11,20 @@ type CustomerForm = {
   contactNumber: string;
 };
 
-const STORAGE_KEY = "barracks.customers.records";
-
 const emptyForm: CustomerForm = {
   name: "",
   email: "",
   contactNumber: "",
 };
 
-const fallbackCustomers: Customer[] = (seedCustomers as Customer[]).map((customer) => ({
-  ...customer,
-}));
-
-const isValidCustomer = (value: unknown): value is Customer => {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-
-  const customer = value as Record<string, unknown>;
-
-  return (
-    typeof customer.id === "string" &&
-    typeof customer.name === "string" &&
-    typeof customer.email === "string" &&
-    typeof customer.contactNumber === "string" &&
-    typeof customer.createdAt === "string"
-  );
-};
-
-const getInitialCustomers = (): Customer[] => {
-  if (typeof window === "undefined") {
-    return fallbackCustomers;
-  }
-
-  const storedRecords = window.localStorage.getItem(STORAGE_KEY);
-
-  if (!storedRecords) {
-    return fallbackCustomers;
-  }
-
-  try {
-    const parsed = JSON.parse(storedRecords) as unknown;
-
-    if (Array.isArray(parsed) && parsed.every(isValidCustomer)) {
-      return parsed;
-    }
-
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(fallbackCustomers));
-    return fallbackCustomers;
-  } catch {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(fallbackCustomers));
-    return fallbackCustomers;
-  }
-};
-
 export default function CustomerRecordsPage() {
-  const [customers, setCustomers] = useState<Customer[]>(() => getInitialCustomers());
+  const { customers, createCustomer, updateCustomer, deleteCustomer } = useCustomerStorage();
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<"name-asc" | "name-desc" | "recent">("name-asc");
   const [formData, setFormData] = useState<CustomerForm>(emptyForm);
   const [formError, setFormError] = useState("");
-
-  useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(customers));
-  }, [customers]);
-
-  const persistCustomers = (updatedCustomers: Customer[]) => {
-    setCustomers(updatedCustomers);
-  };
 
   const filteredCustomers = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -138,34 +74,23 @@ export default function CustomerRecordsPage() {
     setFormError("");
 
     if (editingCustomerId) {
-      const updatedCustomers = customers.map((customer) =>
-        customer.id === editingCustomerId
-          ? {
-              ...customer,
-              name: trimmedName,
-              email: trimmedEmail,
-              contactNumber: trimmedContactNumber,
-            }
-          : customer,
-      );
-
-      persistCustomers(updatedCustomers);
+      updateCustomer(editingCustomerId, {
+        name: trimmedName,
+        email: trimmedEmail,
+        contactNumber: trimmedContactNumber,
+      });
       setSelectedCustomerId(editingCustomerId);
       setEditingCustomerId(null);
       setFormData(emptyForm);
       return;
     }
 
-    const newCustomer: Customer = {
-      id: `cust-${Date.now()}`,
+    const newCustomer = createCustomer({
       name: trimmedName,
       email: trimmedEmail,
       contactNumber: trimmedContactNumber,
-      createdAt: new Date().toISOString(),
-    };
+    });
 
-    const updatedCustomers = [newCustomer, ...customers];
-    persistCustomers(updatedCustomers);
     setSelectedCustomerId(newCustomer.id);
     setFormData(emptyForm);
   };
@@ -180,7 +105,7 @@ export default function CustomerRecordsPage() {
     setFormError("");
   };
 
-  const deleteCustomer = (customerId: string) => {
+  const handleDeleteCustomer = (customerId: string) => {
     const targetCustomer = customers.find((customer) => customer.id === customerId);
 
     if (!targetCustomer) {
@@ -192,8 +117,7 @@ export default function CustomerRecordsPage() {
       return;
     }
 
-    const remainingCustomers = customers.filter((customer) => customer.id !== customerId);
-    persistCustomers(remainingCustomers);
+    deleteCustomer(customerId);
 
     if (editingCustomerId === customerId) {
       setEditingCustomerId(null);
@@ -201,9 +125,10 @@ export default function CustomerRecordsPage() {
       setFormError("");
     }
 
-    setSelectedCustomerId((previous) =>
-      previous === customerId ? remainingCustomers[0]?.id ?? null : previous,
-    );
+    setSelectedCustomerId((previous) => {
+      const updatedCustomers = customers.filter((customer) => customer.id !== customerId);
+      return previous === customerId ? updatedCustomers[0]?.id ?? null : previous;
+    });
   };
 
   const cancelEdit = () => {
@@ -275,7 +200,7 @@ export default function CustomerRecordsPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => deleteCustomer(customer.id)}
+                        onClick={() => handleDeleteCustomer(customer.id)}
                         className="rounded-md bg-rose-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-rose-500"
                       >
                         Delete
@@ -380,6 +305,17 @@ export default function CustomerRecordsPage() {
                     <p>
                       <span className="font-semibold text-white/85">Record ID:</span> {selectedCustomer.id}
                     </p>
+                    <p>
+                      <span className="font-semibold text-white/85">Created At:</span>{" "}
+                      {new Date(selectedCustomer.createdAt).toLocaleString()}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteCustomer(selectedCustomer.id)}
+                      className="mt-2 rounded-md bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-600"
+                    >
+                      Delete This Customer
+                    </button>
                   </div>
                 ) : (
                   <p className="mt-3 text-sm text-white/60">Select a customer to view details.</p>

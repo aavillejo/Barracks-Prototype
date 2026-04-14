@@ -1,19 +1,9 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import Link from "next/link";
 import Header from "@/app/Display/Header";
-import seedStaff from "@/app/data/staff.json";
-
-type StaffMember = {
-  id: string;
-  name: string;
-  role: string;
-  email: string;
-  contactNumber: string;
-  monthlySalary: number;
-  createdAt: string;
-};
+import { useStaffStorage, type StaffMember } from "@/app/Records/DataPersistence/Storage";
 
 type StaffForm = {
   name: string;
@@ -23,8 +13,6 @@ type StaffForm = {
   monthlySalary: string;
 };
 
-const STORAGE_KEY = "barracks.staff.records";
-
 const emptyForm: StaffForm = {
   name: "",
   role: "",
@@ -33,54 +21,8 @@ const emptyForm: StaffForm = {
   monthlySalary: "",
 };
 
-const fallbackStaff: StaffMember[] = (seedStaff as StaffMember[]).map((staff) => ({ ...staff }));
-
-const isValidStaff = (value: unknown): value is StaffMember => {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-
-  const member = value as Record<string, unknown>;
-
-  return (
-    typeof member.id === "string" &&
-    typeof member.name === "string" &&
-    typeof member.role === "string" &&
-    typeof member.email === "string" &&
-    typeof member.contactNumber === "string" &&
-    typeof member.monthlySalary === "number" &&
-    typeof member.createdAt === "string"
-  );
-};
-
-const getInitialStaff = (): StaffMember[] => {
-  if (typeof window === "undefined") {
-    return fallbackStaff;
-  }
-
-  const storedRecords = window.localStorage.getItem(STORAGE_KEY);
-
-  if (!storedRecords) {
-    return fallbackStaff;
-  }
-
-  try {
-    const parsed = JSON.parse(storedRecords) as unknown;
-
-    if (Array.isArray(parsed) && parsed.every(isValidStaff)) {
-      return parsed;
-    }
-
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(fallbackStaff));
-    return fallbackStaff;
-  } catch {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(fallbackStaff));
-    return fallbackStaff;
-  }
-};
-
 export default function StaffRecordsPage() {
-  const [staff, setStaff] = useState<StaffMember[]>(() => getInitialStaff());
+  const { staff, createStaff, updateStaff, deleteStaff } = useStaffStorage();
   const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
   const [editingStaffId, setEditingStaffId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -88,14 +30,6 @@ export default function StaffRecordsPage() {
   const [sortBy, setSortBy] = useState<"name-asc" | "salary-high" | "salary-low">("name-asc");
   const [formData, setFormData] = useState<StaffForm>(emptyForm);
   const [formError, setFormError] = useState("");
-
-  useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(staff));
-  }, [staff]);
-
-  const persistStaff = (updatedStaff: StaffMember[]) => {
-    setStaff(updatedStaff);
-  };
 
   const roleOptions = useMemo(() => {
     const uniqueRoles = new Set(staff.map((member) => member.role).filter(Boolean));
@@ -164,38 +98,27 @@ export default function StaffRecordsPage() {
     setFormError("");
 
     if (editingStaffId) {
-      const updatedStaff = staff.map((member) =>
-        member.id === editingStaffId
-          ? {
-              ...member,
-              name: trimmedName,
-              role: trimmedRole,
-              email: trimmedEmail,
-              contactNumber: trimmedContactNumber,
-              monthlySalary: salary,
-            }
-          : member,
-      );
-
-      persistStaff(updatedStaff);
+      updateStaff(editingStaffId, {
+        name: trimmedName,
+        role: trimmedRole,
+        email: trimmedEmail,
+        contactNumber: trimmedContactNumber,
+        monthlySalary: salary,
+      });
       setSelectedStaffId(editingStaffId);
       setEditingStaffId(null);
       setFormData(emptyForm);
       return;
     }
 
-    const newStaff: StaffMember = {
-      id: `staff-${Date.now()}`,
+    const newStaff = createStaff({
       name: trimmedName,
       role: trimmedRole,
       email: trimmedEmail,
       contactNumber: trimmedContactNumber,
       monthlySalary: salary,
-      createdAt: new Date().toISOString(),
-    };
+    });
 
-    const updatedStaff = [newStaff, ...staff];
-    persistStaff(updatedStaff);
     setSelectedStaffId(newStaff.id);
     setFormData(emptyForm);
   };
@@ -212,7 +135,7 @@ export default function StaffRecordsPage() {
     setFormError("");
   };
 
-  const deleteStaff = (staffId: string) => {
+  const handleDeleteStaff = (staffId: string) => {
     const targetStaff = staff.find((member) => member.id === staffId);
 
     if (!targetStaff) {
@@ -224,8 +147,7 @@ export default function StaffRecordsPage() {
       return;
     }
 
-    const remainingStaff = staff.filter((member) => member.id !== staffId);
-    persistStaff(remainingStaff);
+    deleteStaff(staffId);
 
     if (editingStaffId === staffId) {
       setEditingStaffId(null);
@@ -233,7 +155,10 @@ export default function StaffRecordsPage() {
       setFormError("");
     }
 
-    setSelectedStaffId((previous) => (previous === staffId ? remainingStaff[0]?.id ?? null : previous));
+    setSelectedStaffId((previous) => {
+      const remainingStaff = staff.filter((member) => member.id !== staffId);
+      return previous === staffId ? remainingStaff[0]?.id ?? null : previous;
+    });
   };
 
   const cancelEdit = () => {
@@ -328,7 +253,7 @@ export default function StaffRecordsPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => deleteStaff(member.id)}
+                        onClick={() => handleDeleteStaff(member.id)}
                         className="rounded-md bg-rose-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-rose-500"
                       >
                         Delete
@@ -469,7 +394,7 @@ export default function StaffRecordsPage() {
                     </p>
                     <button
                       type="button"
-                      onClick={() => deleteStaff(selectedStaff.id)}
+                      onClick={() => handleDeleteStaff(selectedStaff.id)}
                       className="mt-2 rounded-md bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-600"
                     >
                       Delete This Staff Record
