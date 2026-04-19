@@ -33,6 +33,7 @@ const urgencyBadgeClasses: Record<UrgencyLevel, string> = {
   High: "bg-rose-500/20 text-rose-300 border border-rose-400/40",
 };
 
+
 export default function InventoryPage() {
   const { inventoryItems, createInventoryItem, updateInventoryItem, deleteInventoryItem } =
     useInventoryStorage();
