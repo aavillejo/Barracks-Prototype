@@ -2,12 +2,12 @@
 
 import { User, Network, Package, TrendingUp } from 'lucide-react';
 import LandingPage from "./LandingPageClient";
-import { useCustomerStorage, useStaffStorage, useInventoryStorage } from "@/app/Records/DataPersistence/Storage";
+import { getAllCustomers, getAllStaff, getAllInventory } from "@/app/lib/records-api";
 
 export default function DashboardWrapper() {
-    const { customers } = useCustomerStorage();
-    const { staff } = useStaffStorage();
-    const { inventoryItems } = useInventoryStorage();
+    const customers = getAllCustomers();
+    const staff = getAllStaff();
+    const inventoryItems = getAllInventory();
 
     const customerCount = customers.length.toLocaleString();
     const staffCount = staff.length.toString();
