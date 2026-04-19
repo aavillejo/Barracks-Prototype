@@ -58,6 +58,12 @@ export default function StaffRecordsPage() {
     });
   }, [staff, searchQuery, roleFilter, sortBy]);
 
+  const adminCount = useMemo(
+    () =>
+      staff.filter((member) => member.role.trim().toLowerCase() === "admin").length,
+    [staff],
+  );
+
   const selectedStaff = staff.find((member) => member.id === selectedStaffId) ?? staff[0] ?? null;
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -177,6 +183,9 @@ export default function StaffRecordsPage() {
             <p className="mt-1 text-sm text-white/70">
               Track staff details, filter by role, and monitor monthly salary quickly.
             </p>
+            <p className="mt-1 text-xs text-emerald-200/90">
+              Admin accounts in records: {adminCount}
+            </p>
 
             <div className="mt-4 grid gap-3 md:grid-cols-3">
               <input
@@ -225,7 +234,14 @@ export default function StaffRecordsPage() {
                     className="rounded-xl border border-white/10 bg-white/5 p-4 shadow-sm"
                   >
                     <p className="text-lg font-semibold">{member.name}</p>
-                    <p className="text-sm text-white/75">{member.role}</p>
+                    <p className="text-sm text-white/75">
+                      {member.role}
+                      {member.role.trim().toLowerCase() === "admin" ? (
+                        <span className="ml-2 rounded-full border border-emerald-300/50 bg-emerald-400/20 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-emerald-200">
+                          Admin
+                        </span>
+                      ) : null}
+                    </p>
                     <p className="text-sm text-white/75">{member.email}</p>
                     <p className="text-sm text-white/75">{member.contactNumber}</p>
                     <p className="text-sm text-white/75">

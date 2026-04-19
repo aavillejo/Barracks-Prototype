@@ -134,6 +134,31 @@ export type StaffMember = {
   createdAt: string;
 };
 
+const defaultAdminStaff: StaffMember[] = [
+  {
+    id: "admin-0001",
+    name: "System Admin",
+    role: "Admin",
+    email: "admin@barracks.local",
+    contactNumber: "N/A",
+    monthlySalary: 0,
+    createdAt: "2026-01-01T00:00:00.000Z",
+  },
+];
+
+const isAdminStaff = (member: StaffMember) =>
+  member.role.trim().toLowerCase() === "admin" || member.id.startsWith("admin-");
+
+const ensureAdminInStaff = (staffList: StaffMember[]): StaffMember[] => {
+  const hasAdmin = staffList.some(isAdminStaff);
+
+  if (hasAdmin) {
+    return staffList;
+  }
+
+  return [...defaultAdminStaff.map((admin) => ({ ...admin })), ...staffList];
+};
+
 const isValidStaff = (value: unknown): value is StaffMember => {
   if (!value || typeof value !== "object") {
     return false;
@@ -154,27 +179,33 @@ const isValidStaff = (value: unknown): value is StaffMember => {
 
 const getInitialStaff = (storageKey: string): StaffMember[] => {
   if (typeof window === "undefined") {
-    return (seedStaff as StaffMember[]).map((staff) => ({ ...staff }));
+    const seededStaff = (seedStaff as StaffMember[]).map((staff) => ({ ...staff }));
+    return ensureAdminInStaff(seededStaff);
   }
 
   const storedRecords = window.localStorage.getItem(storageKey);
 
   if (!storedRecords) {
-    return (seedStaff as StaffMember[]).map((staff) => ({ ...staff }));
+    const seededStaff = (seedStaff as StaffMember[]).map((staff) => ({ ...staff }));
+    return ensureAdminInStaff(seededStaff);
   }
 
   try {
     const parsed = JSON.parse(storedRecords) as unknown;
 
     if (Array.isArray(parsed) && parsed.every(isValidStaff)) {
-      return parsed;
+      return ensureAdminInStaff(parsed);
     }
 
-    const fallback = (seedStaff as StaffMember[]).map((staff) => ({ ...staff }));
+    const fallback = ensureAdminInStaff(
+      (seedStaff as StaffMember[]).map((staff) => ({ ...staff })),
+    );
     window.localStorage.setItem(storageKey, JSON.stringify(fallback));
     return fallback;
   } catch {
-    const fallback = (seedStaff as StaffMember[]).map((staff) => ({ ...staff }));
+    const fallback = ensureAdminInStaff(
+      (seedStaff as StaffMember[]).map((staff) => ({ ...staff })),
+    );
     window.localStorage.setItem(storageKey, JSON.stringify(fallback));
     return fallback;
   }
