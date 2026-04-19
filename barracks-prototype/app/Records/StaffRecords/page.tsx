@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Header from "@/app/Display/Header";
 import { useStaffStorage, type StaffMember } from "@/app/Records/DataPersistence/Storage";
@@ -30,6 +30,31 @@ export default function StaffRecordsPage() {
   const [sortBy, setSortBy] = useState<"name-asc" | "salary-high" | "salary-low">("name-asc");
   const [formData, setFormData] = useState<StaffForm>(emptyForm);
   const [formError, setFormError] = useState("");
+
+  useEffect(() => {
+    const handleHeaderSearch = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      setSearchQuery(customEvent.detail);
+    };
+    const handleHeaderCategory = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      setRoleFilter(customEvent.detail);
+    };
+    const handleHeaderSort = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      setSortBy(customEvent.detail as "name-asc" | "salary-high" | "salary-low");
+    };
+
+    window.addEventListener("headerSearch", handleHeaderSearch);
+    window.addEventListener("headerCategoryFilter", handleHeaderCategory);
+    window.addEventListener("headerSort", handleHeaderSort);
+
+    return () => {
+      window.removeEventListener("headerSearch", handleHeaderSearch);
+      window.removeEventListener("headerCategoryFilter", handleHeaderCategory);
+      window.removeEventListener("headerSort", handleHeaderSort);
+    };
+  }, []);
 
   const roleOptions = useMemo(() => {
     const uniqueRoles = new Set(staff.map((member) => member.role).filter(Boolean));
@@ -175,42 +200,8 @@ export default function StaffRecordsPage() {
           <section className="rounded-2xl border border-white/15 bg-black/45 p-5 backdrop-blur-sm">
             <h1 className="text-3xl font-bold">Staff Records</h1>
             <p className="mt-1 text-sm text-white/70">
-              Track staff details, filter by role, and monitor monthly salary quickly.
+              Track staff details, filter by role, and monitor monthly salary via the header controls.
             </p>
-
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Search staff by name"
-                className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 outline-none ring-emerald-300 transition focus:ring-2"
-              />
-
-              <select
-                value={roleFilter}
-                onChange={(event) => setRoleFilter(event.target.value)}
-                className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 outline-none ring-emerald-300 transition focus:ring-2"
-              >
-                {roleOptions.map((role) => (
-                  <option key={role} value={role}>
-                    {role === "all" ? "Filter: All Roles" : `Role: ${role}`}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                value={sortBy}
-                onChange={(event) =>
-                  setSortBy(event.target.value as "name-asc" | "salary-high" | "salary-low")
-                }
-                className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 outline-none ring-emerald-300 transition focus:ring-2"
-              >
-                <option value="name-asc">Sort: Name A-Z</option>
-                <option value="salary-high">Sort: Salary High-Low</option>
-                <option value="salary-low">Sort: Salary Low-High</option>
-              </select>
-            </div>
           </section>
 
           <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
@@ -417,32 +408,3 @@ export default function StaffRecordsPage() {
     </>
   );
 }
-
-/*
-// NEW UNIFIED INTERFACE - PeerReview branch implementation
-import PageInterface from "../PageInterface";
-import { Network } from "lucide-react";
-
-const sampleStaff = [
-  { id: "1", name: "Daniel Cruz", subtitle1: "Barber", subtitle2: "daniel@barracks.com" },
-  { id: "2", name: "Maria Santos", subtitle1: "Cashier", subtitle2: "maria@barracks.com" },
-  { id: "3", name: "John Reyes", subtitle1: "Manager", subtitle2: "john@barracks.com" },
-];
-
-export default function StaffRecordsPage() {
-  return (
-    <PageInterface
-      title="Staff"
-      description="Browse, search, and manage all staff records"
-      icon={<Network size={24} />}
-      color="green"
-      records={sampleStaff}
-      totalLabel="All Staff"
-      onAdd={() => console.log("Add staff")}
-      onView={(id) => console.log("View staff", id)}
-      onEdit={(id) => console.log("Edit staff", id)}
-      onDelete={(id) => console.log("Delete staff", id)}
-    />
-  );
-}
-*/
