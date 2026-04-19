@@ -281,6 +281,8 @@ export const useStaffStorage = () => {
 
 // ==================== inventory ====================
 
+export type { InventoryItem };
+
 const getInitialInventory = (storageKey: string): InventoryItem[] => {
   if (typeof window === "undefined") {
     return (seedInventory as InventoryItem[]).map((item) => ({ ...item }));
