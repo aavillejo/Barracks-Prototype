@@ -1,9 +1,10 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Header from "@/app/Display/Header";
 import { useStaffStorage, type StaffMember } from "@/app/Records/DataPersistence/Storage";
+import usersData from "@/app/data/users.json";
 
 type StaffForm = {
   name: string;
@@ -31,6 +32,31 @@ export default function StaffRecordsPage() {
   const [formData, setFormData] = useState<StaffForm>(emptyForm);
   const [formError, setFormError] = useState("");
 
+  useEffect(() => {
+    const handleHeaderSearch = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      setSearchQuery(customEvent.detail);
+    };
+    const handleHeaderCategory = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      setRoleFilter(customEvent.detail);
+    };
+    const handleHeaderSort = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      setSortBy(customEvent.detail as "name-asc" | "salary-high" | "salary-low");
+    };
+
+    window.addEventListener("headerSearch", handleHeaderSearch);
+    window.addEventListener("headerCategoryFilter", handleHeaderCategory);
+    window.addEventListener("headerSort", handleHeaderSort);
+
+    return () => {
+      window.removeEventListener("headerSearch", handleHeaderSearch);
+      window.removeEventListener("headerCategoryFilter", handleHeaderCategory);
+      window.removeEventListener("headerSort", handleHeaderSort);
+    };
+  }, []);
+
   const roleOptions = useMemo(() => {
     const uniqueRoles = new Set(staff.map((member) => member.role).filter(Boolean));
     return ["all", ...Array.from(uniqueRoles).sort((a, b) => a.localeCompare(b))];
@@ -57,6 +83,14 @@ export default function StaffRecordsPage() {
       return a.name.localeCompare(b.name);
     });
   }, [staff, searchQuery, roleFilter, sortBy]);
+
+  const adminUserIds = useMemo(() => {
+    return new Set(
+      usersData.filter((u) => u.isAdmin).map((u) => u.staffId)
+    );
+  }, []);
+
+  const isAdmin = (staffId: string) => adminUserIds.has(staffId);
 
   const selectedStaff = staff.find((member) => member.id === selectedStaffId) ?? staff[0] ?? null;
 
@@ -175,42 +209,8 @@ export default function StaffRecordsPage() {
           <section className="rounded-2xl border border-white/15 bg-black/45 p-5 backdrop-blur-sm">
             <h1 className="text-3xl font-bold">Staff Records</h1>
             <p className="mt-1 text-sm text-white/70">
-              Track staff details, filter by role, and monitor monthly salary quickly.
+              Track staff details, filter by role, and monitor monthly salary via the header controls.
             </p>
-
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Search staff by name"
-                className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 outline-none ring-emerald-300 transition focus:ring-2"
-              />
-
-              <select
-                value={roleFilter}
-                onChange={(event) => setRoleFilter(event.target.value)}
-                className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 outline-none ring-emerald-300 transition focus:ring-2"
-              >
-                {roleOptions.map((role) => (
-                  <option key={role} value={role}>
-                    {role === "all" ? "Filter: All Roles" : `Role: ${role}`}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                value={sortBy}
-                onChange={(event) =>
-                  setSortBy(event.target.value as "name-asc" | "salary-high" | "salary-low")
-                }
-                className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 outline-none ring-emerald-300 transition focus:ring-2"
-              >
-                <option value="name-asc">Sort: Name A-Z</option>
-                <option value="salary-high">Sort: Salary High-Low</option>
-                <option value="salary-low">Sort: Salary Low-High</option>
-              </select>
-            </div>
           </section>
 
           <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
@@ -225,7 +225,14 @@ export default function StaffRecordsPage() {
                     className="rounded-xl border border-white/10 bg-white/5 p-4 shadow-sm"
                   >
                     <p className="text-lg font-semibold">{member.name}</p>
-                    <p className="text-sm text-white/75">{member.role}</p>
+                    <p className="text-sm text-white/75">
+                      {member.role}
+                      {isAdmin(member.id) ? (
+                        <span className="ml-2 rounded-full border border-emerald-300/50 bg-emerald-400/20 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-emerald-200">
+                          Admin
+                        </span>
+                      ) : null}
+                    </p>
                     <p className="text-sm text-white/75">{member.email}</p>
                     <p className="text-sm text-white/75">{member.contactNumber}</p>
                     <p className="text-sm text-white/75">
@@ -417,32 +424,3 @@ export default function StaffRecordsPage() {
     </>
   );
 }
-
-/*
-// NEW UNIFIED INTERFACE - PeerReview branch implementation
-import PageInterface from "../PageInterface";
-import { Network } from "lucide-react";
-
-const sampleStaff = [
-  { id: "1", name: "Daniel Cruz", subtitle1: "Barber", subtitle2: "daniel@barracks.com" },
-  { id: "2", name: "Maria Santos", subtitle1: "Cashier", subtitle2: "maria@barracks.com" },
-  { id: "3", name: "John Reyes", subtitle1: "Manager", subtitle2: "john@barracks.com" },
-];
-
-export default function StaffRecordsPage() {
-  return (
-    <PageInterface
-      title="Staff"
-      description="Browse, search, and manage all staff records"
-      icon={<Network size={24} />}
-      color="green"
-      records={sampleStaff}
-      totalLabel="All Staff"
-      onAdd={() => console.log("Add staff")}
-      onView={(id) => console.log("View staff", id)}
-      onEdit={(id) => console.log("Edit staff", id)}
-      onDelete={(id) => console.log("Delete staff", id)}
-    />
-  );
-}
-*/

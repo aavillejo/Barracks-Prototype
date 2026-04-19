@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Header from "@/app/Display/Header";
 import { useCustomerStorage, type Customer } from "@/app/Records/DataPersistence/Storage";
@@ -25,6 +25,25 @@ export default function CustomerRecordsPage() {
   const [sortBy, setSortBy] = useState<"name-asc" | "name-desc" | "recent">("name-asc");
   const [formData, setFormData] = useState<CustomerForm>(emptyForm);
   const [formError, setFormError] = useState("");
+
+  useEffect(() => {
+    const handleHeaderSearch = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      setSearchQuery(customEvent.detail);
+    };
+    const handleHeaderSort = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      setSortBy(customEvent.detail as "name-asc" | "name-desc" | "recent");
+    };
+
+    window.addEventListener("headerSearch", handleHeaderSearch);
+    window.addEventListener("headerSort", handleHeaderSort);
+
+    return () => {
+      window.removeEventListener("headerSearch", handleHeaderSearch);
+      window.removeEventListener("headerSort", handleHeaderSort);
+    };
+  }, []);
 
   const filteredCustomers = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -145,28 +164,8 @@ export default function CustomerRecordsPage() {
           <section className="rounded-2xl border border-white/15 bg-black/45 p-5 backdrop-blur-sm">
             <h1 className="text-3xl font-bold">Customer Records</h1>
             <p className="mt-1 text-sm text-white/70">
-              Manage customer data with search and sorting, then view full details in one click.
+              Manage customer data with search and sorting via the header, then view full details in one click.
             </p>
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Search customers by name"
-                className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 outline-none ring-emerald-300 transition focus:ring-2"
-              />
-              <select
-                value={sortBy}
-                onChange={(event) =>
-                  setSortBy(event.target.value as "name-asc" | "name-desc" | "recent")
-                }
-                className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 outline-none ring-emerald-300 transition focus:ring-2"
-              >
-                <option value="name-asc">Sort: Name A-Z</option>
-                <option value="name-desc">Sort: Name Z-A</option>
-                <option value="recent">Sort: Recently Added</option>
-              </select>
-            </div>
           </section>
 
           <main className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
@@ -328,52 +327,3 @@ export default function CustomerRecordsPage() {
     </>
   );
 }
-
-/*
-
-// NEW UNIFIED INTERFACE - PeerReview branch implementation
-import PageInterface from "../PageInterface";
-import { Network } from "lucide-react";
-
-const sampleCustomers = [
-  {
-    "id": "cust-1001",
-    "name": "Alyssa Rivera",
-    "email": "alyssa.rivera@email.com",
-    "contactNumber": "+63 917 555 0111",
-    "createdAt": "2026-01-18T10:22:00.000Z"
-  },
-  {
-    "id": "cust-1002",
-    "name": "Marc Tan",
-    "email": "marc.tan@email.com",
-    "contactNumber": "+63 917 555 0142",
-    "createdAt": "2026-02-04T13:45:00.000Z"
-  },
-  {
-    "id": "cust-1003",
-    "name": "Jessa Lim",
-    "email": "jessa.lim@email.com",
-    "contactNumber": "+63 917 555 0188",
-    "createdAt": "2026-03-01T08:10:00.000Z"
-  }
-];
-
-export default function CustomerRecordsPage() {
-  return (
-    <PageInterface
-      title="Customer Records"
-      description="Browse, search, and manage all customer records"
-      icon={<Network size={24} />}
-      color="pink"
-      records={sampleCustomers}
-      totalLabel="All Items"
-      onAdd={() => console.log("Add item")}
-      onView={(id) => console.log("View item", id)}
-      onEdit={(id) => console.log("Edit item", id)}
-      onDelete={(id) => console.log("Delete item", id)}
-    />
-  );
-}
-
-*/

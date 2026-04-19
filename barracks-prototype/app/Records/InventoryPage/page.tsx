@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import Header from "@/app/Display/Header";
 import { useInventoryStorage } from "@/app/Records/DataPersistence/Storage";
 import {
@@ -33,6 +33,7 @@ const urgencyBadgeClasses: Record<UrgencyLevel, string> = {
   High: "bg-rose-500/20 text-rose-300 border border-rose-400/40",
 };
 
+
 export default function InventoryPage() {
   const { inventoryItems, createInventoryItem, updateInventoryItem, deleteInventoryItem } =
     useInventoryStorage();
@@ -44,6 +45,31 @@ export default function InventoryPage() {
   const [formData, setFormData] = useState<InventoryForm>(emptyForm);
   const [formError, setFormError] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
+
+  useEffect(() => {
+    const handleHeaderSearch = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      setSearchQuery(customEvent.detail);
+    };
+    const handleHeaderCategory = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      setCategoryFilter(customEvent.detail);
+    };
+    const handleHeaderSort = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      setSortBy(customEvent.detail as SortBy);
+    };
+
+    window.addEventListener("headerSearch", handleHeaderSearch);
+    window.addEventListener("headerCategoryFilter", handleHeaderCategory);
+    window.addEventListener("headerSort", handleHeaderSort);
+
+    return () => {
+      window.removeEventListener("headerSearch", handleHeaderSearch);
+      window.removeEventListener("headerCategoryFilter", handleHeaderCategory);
+      window.removeEventListener("headerSort", handleHeaderSort);
+    };
+  }, []);
 
   const categoryOptions = useMemo(() => {
     const uniqueCategories = new Set(inventoryItems.map((item) => item.category));
@@ -199,43 +225,8 @@ export default function InventoryPage() {
           <section className="rounded-2xl border border-white/15 bg-black/45 p-5 backdrop-blur-sm">
             <h1 className="text-3xl font-bold">Inventory Records</h1>
             <p className="mt-1 text-sm text-white/70">
-              Manage stock levels, item urgency, and inventory value using frontend-only JSON
-              seeded storage.
+              Manage stock levels, item urgency, and inventory value using header search and filters.
             </p>
-
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Search by item name, category, or ID"
-                className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 outline-none ring-pink-300 transition focus:ring-2"
-              />
-
-              <select
-                value={categoryFilter}
-                onChange={(event) => setCategoryFilter(event.target.value)}
-                className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 outline-none ring-pink-300 transition focus:ring-2"
-              >
-                {categoryOptions.map((category) => (
-                  <option key={category} value={category}>
-                    {category === "all" ? "Filter: All Categories" : `Category: ${category}`}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                value={sortBy}
-                onChange={(event) => setSortBy(event.target.value as SortBy)}
-                className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 outline-none ring-pink-300 transition focus:ring-2"
-              >
-                <option value="name-asc">Sort: Name A-Z</option>
-                <option value="quantity-low">Sort: Quantity Low-High</option>
-                <option value="quantity-high">Sort: Quantity High-Low</option>
-                <option value="value-high">Sort: Value High-Low</option>
-                <option value="recent">Sort: Recently Updated</option>
-              </select>
-            </div>
 
             <p className="mt-4 text-sm text-white/75">
               Total Inventory Value:{" "}
