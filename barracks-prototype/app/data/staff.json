@@ -25,5 +25,14 @@
     "contactNumber": "+63 917 555 0347",
     "monthlySalary": 25500,
     "createdAt": "2026-02-14T14:15:00.000Z"
+  },
+  {
+    "id": "staff-2004",
+    "name": "Barmin",
+    "role": "Admin",
+    "email": "admin.user@email.com",
+    "contactNumber": "+63 917 555 0347",
+    "monthlySalary": 300676767,
+    "createdAt": "2026-02-14T14:15:00.000Z"
   }
 ]

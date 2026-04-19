@@ -1,0 +1,18 @@
+[
+  {
+    "staffId": "staff-2001",
+    "isAdmin": false
+  },
+  {
+    "staffId": "staff-2002",
+    "isAdmin": false
+  },
+  {
+    "staffId": "staff-2003",
+    "isAdmin": false
+  },
+  {
+    "staffId": "staff-2004",
+    "isAdmin": true
+  }
+]
