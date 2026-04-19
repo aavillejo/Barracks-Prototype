@@ -1,18 +1,9 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import Link from "next/link";
 import Header from "@/app/Display/Header";
-
-type StaffMember = {
-  id: string;
-  name: string;
-  role: string;
-  email: string;
-  contactNumber: string;
-  monthlySalary: number;
-  createdAt: string;
-};
+import { useStaffStorage, type StaffMember } from "@/app/Records/DataPersistence/Storage";
 
 type StaffForm = {
   name: string;
@@ -31,7 +22,7 @@ const emptyForm: StaffForm = {
 };
 
 export default function StaffRecordsPage() {
-  const [staff, setStaff] = useState<StaffMember[]>([]);
+  const { staff, createStaff, updateStaff, deleteStaff } = useStaffStorage();
   const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
   const [editingStaffId, setEditingStaffId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -39,31 +30,6 @@ export default function StaffRecordsPage() {
   const [sortBy, setSortBy] = useState<"name-asc" | "salary-high" | "salary-low">("name-asc");
   const [formData, setFormData] = useState<StaffForm>(emptyForm);
   const [formError, setFormError] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    async function loadStaff() {
-      try {
-        const response = await fetch("/api/staff", { cache: "no-store" });
-        if (!response.ok) {
-          throw new Error("Failed to load staff.");
-        }
-
-        const data = (await response.json()) as StaffMember[];
-        setStaff(data);
-      } catch {
-        setFormError("Could not load staff records.");
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    void loadStaff();
-  }, []);
-
-  const persistStaff = (updatedStaff: StaffMember[]) => {
-    setStaff(updatedStaff);
-  };
 
   const roleOptions = useMemo(() => {
     const uniqueRoles = new Set(staff.map((member) => member.role).filter(Boolean));
@@ -94,7 +60,7 @@ export default function StaffRecordsPage() {
 
   const selectedStaff = staff.find((member) => member.id === selectedStaffId) ?? staff[0] ?? null;
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     const trimmedName = formData.name.trim();
@@ -132,55 +98,29 @@ export default function StaffRecordsPage() {
     setFormError("");
 
     if (editingStaffId) {
-      const updatedStaff = staff.map((member) =>
-        member.id === editingStaffId
-          ? {
-              ...member,
-              name: trimmedName,
-              role: trimmedRole,
-              email: trimmedEmail,
-              contactNumber: trimmedContactNumber,
-              monthlySalary: salary,
-            }
-          : member,
-      );
-
-      persistStaff(updatedStaff);
+      updateStaff(editingStaffId, {
+        name: trimmedName,
+        role: trimmedRole,
+        email: trimmedEmail,
+        contactNumber: trimmedContactNumber,
+        monthlySalary: salary,
+      });
       setSelectedStaffId(editingStaffId);
       setEditingStaffId(null);
       setFormData(emptyForm);
       return;
     }
 
-    try {
-      const response = await fetch("/api/staff", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: trimmedName,
-          role: trimmedRole,
-          email: trimmedEmail,
-          contactNumber: trimmedContactNumber,
-          monthlySalary: salary,
-        }),
-      });
+    const newStaff = createStaff({
+      name: trimmedName,
+      role: trimmedRole,
+      email: trimmedEmail,
+      contactNumber: trimmedContactNumber,
+      monthlySalary: salary,
+    });
 
-      const data = (await response.json()) as StaffMember | { message?: string };
-
-      if (!response.ok) {
-        setFormError((data as { message?: string }).message ?? "Could not create staff record.");
-        return;
-      }
-
-      const createdStaff = data as StaffMember;
-      persistStaff([createdStaff, ...staff]);
-      setSelectedStaffId(createdStaff.id);
-      setFormData(emptyForm);
-    } catch {
-      setFormError("Could not create staff record.");
-    }
+    setSelectedStaffId(newStaff.id);
+    setFormData(emptyForm);
   };
 
   const startEdit = (member: StaffMember) => {
@@ -195,7 +135,7 @@ export default function StaffRecordsPage() {
     setFormError("");
   };
 
-  const deleteStaff = (staffId: string) => {
+  const handleDeleteStaff = (staffId: string) => {
     const targetStaff = staff.find((member) => member.id === staffId);
 
     if (!targetStaff) {
@@ -207,8 +147,7 @@ export default function StaffRecordsPage() {
       return;
     }
 
-    const remainingStaff = staff.filter((member) => member.id !== staffId);
-    persistStaff(remainingStaff);
+    deleteStaff(staffId);
 
     if (editingStaffId === staffId) {
       setEditingStaffId(null);
@@ -216,7 +155,10 @@ export default function StaffRecordsPage() {
       setFormError("");
     }
 
-    setSelectedStaffId((previous) => (previous === staffId ? remainingStaff[0]?.id ?? null : previous));
+    setSelectedStaffId((previous) => {
+      const remainingStaff = staff.filter((member) => member.id !== staffId);
+      return previous === staffId ? remainingStaff[0]?.id ?? null : previous;
+    });
   };
 
   const cancelEdit = () => {
@@ -274,9 +216,7 @@ export default function StaffRecordsPage() {
           <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
             <section className="rounded-2xl border border-white/15 bg-black/45 p-5 backdrop-blur-sm">
               <h2 className="text-xl font-semibold">Record List View</h2>
-              <p className="mt-1 text-sm text-white/70">
-                {isLoading ? "Loading staff records..." : `${filteredStaff.length} staff record(s)`}
-              </p>
+              <p className="mt-1 text-sm text-white/70">{filteredStaff.length} staff record(s)</p>
 
               <div className="mt-4 space-y-3">
                 {filteredStaff.map((member) => (
@@ -313,7 +253,7 @@ export default function StaffRecordsPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => deleteStaff(member.id)}
+                        onClick={() => handleDeleteStaff(member.id)}
                         className="rounded-md bg-rose-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-rose-500"
                       >
                         Delete
@@ -454,7 +394,7 @@ export default function StaffRecordsPage() {
                     </p>
                     <button
                       type="button"
-                      onClick={() => deleteStaff(selectedStaff.id)}
+                      onClick={() => handleDeleteStaff(selectedStaff.id)}
                       className="mt-2 rounded-md bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-600"
                     >
                       Delete This Staff Record
@@ -477,3 +417,32 @@ export default function StaffRecordsPage() {
     </>
   );
 }
+
+/*
+// NEW UNIFIED INTERFACE - PeerReview branch implementation
+import PageInterface from "../PageInterface";
+import { Network } from "lucide-react";
+
+const sampleStaff = [
+  { id: "1", name: "Daniel Cruz", subtitle1: "Barber", subtitle2: "daniel@barracks.com" },
+  { id: "2", name: "Maria Santos", subtitle1: "Cashier", subtitle2: "maria@barracks.com" },
+  { id: "3", name: "John Reyes", subtitle1: "Manager", subtitle2: "john@barracks.com" },
+];
+
+export default function StaffRecordsPage() {
+  return (
+    <PageInterface
+      title="Staff"
+      description="Browse, search, and manage all staff records"
+      icon={<Network size={24} />}
+      color="green"
+      records={sampleStaff}
+      totalLabel="All Staff"
+      onAdd={() => console.log("Add staff")}
+      onView={(id) => console.log("View staff", id)}
+      onEdit={(id) => console.log("Edit staff", id)}
+      onDelete={(id) => console.log("Delete staff", id)}
+    />
+  );
+}
+*/

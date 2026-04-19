@@ -1,8 +1,37 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import Header from "../../Display/Header";
+import { FormEvent, useMemo, useState } from "react";
+import Header from "@/app/Display/Header";
+import { useInventoryStorage } from "@/app/Records/DataPersistence/Storage";
+import {
+  type InventoryItem,
+  type UrgencyLevel,
+  URGENCY_LEVELS,
+} from "@/app/lib/inventory-types";
+
+type InventoryForm = {
+  itemName: string;
+  category: string;
+  unitPrice: string;
+  quantity: string;
+  urgencyLevel: UrgencyLevel;
+};
+
+type SortBy = "name-asc" | "quantity-low" | "quantity-high" | "value-high" | "recent";
+
+const emptyForm: InventoryForm = {
+  itemName: "",
+  category: "",
+  unitPrice: "",
+  quantity: "",
+  urgencyLevel: "Medium",
+};
+
+const urgencyBadgeClasses: Record<UrgencyLevel, string> = {
+  Low: "bg-emerald-500/20 text-emerald-300 border border-emerald-400/40",
+  Medium: "bg-amber-500/20 text-amber-300 border border-amber-400/40",
+  High: "bg-rose-500/20 text-rose-300 border border-rose-400/40",
+};
 
 type InventoryItem = {
   id: number;
@@ -25,222 +54,291 @@ const emptyForm: InventoryForm = {
 };
 
 export default function InventoryPage() {
-  const [items, setItems] = useState<InventoryItem[]>([]);
-  const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
-  const [editingItemId, setEditingItemId] = useState<number | null>(null);
+  const { inventoryItems, createInventoryItem, updateInventoryItem, deleteInventoryItem } =
+    useInventoryStorage();
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState<"name-asc" | "quantity-high" | "price-high">("name-asc");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [sortBy, setSortBy] = useState<SortBy>("name-asc");
   const [formData, setFormData] = useState<InventoryForm>(emptyForm);
   const [formError, setFormError] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+  const [statusMessage, setStatusMessage] = useState("");
 
-  useEffect(() => {
-    const stored = localStorage.getItem("inventory");
-    if (stored) {
-      setItems(JSON.parse(stored));
-    }
-    setIsLoading(false);
-  }, []);
+  const categoryOptions = useMemo(() => {
+    const uniqueCategories = new Set(inventoryItems.map((item) => item.category));
+    return ["all", ...Array.from(uniqueCategories).sort((a, b) => a.localeCompare(b))];
+  }, [inventoryItems]);
 
-  const persistItems = (updatedItems: InventoryItem[]) => {
-    setItems(updatedItems);
-    localStorage.setItem("inventory", JSON.stringify(updatedItems));
-  };
+  const filteredItems = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
 
-  const filteredItems = items
-    .filter((item) => item.name.toLowerCase().includes(searchQuery.toLowerCase()))
-    .sort((a, b) => {
-      if (sortBy === "quantity-high") return b.quantity - a.quantity;
-      if (sortBy === "price-high") return b.price - a.price;
-      return a.name.localeCompare(b.name);
+    const visibleItems = inventoryItems.filter((item) => {
+      const matchesQuery =
+        item.itemName.toLowerCase().includes(normalizedQuery) ||
+        item.category.toLowerCase().includes(normalizedQuery) ||
+        item.itemID.toLowerCase().includes(normalizedQuery);
+      const matchesCategory = categoryFilter === "all" || item.category === categoryFilter;
+      return matchesQuery && matchesCategory;
     });
 
-  const selectedItem = items.find((item) => item.id === selectedItemId) ?? items[0] ?? null;
+    return visibleItems.sort((a, b) => {
+      if (sortBy === "quantity-low") {
+        return a.quantity - b.quantity;
+      }
+      if (sortBy === "quantity-high") {
+        return b.quantity - a.quantity;
+      }
+      if (sortBy === "value-high") {
+        return b.unitPrice * b.quantity - a.unitPrice * a.quantity;
+      }
+      if (sortBy === "recent") {
+        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+      }
+      return a.itemName.localeCompare(b.itemName);
+    });
+  }, [inventoryItems, searchQuery, categoryFilter, sortBy]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const selectedItem =
+    inventoryItems.find((item) => item.itemID === selectedItemId) ?? inventoryItems[0] ?? null;
 
-    const trimmedName = formData.name.trim();
-    const quantity = Number(formData.quantity);
-    const price = Number(formData.price);
+  const lowStockItems = useMemo(
+    () =>
+      inventoryItems
+        .filter((item) => item.quantity <= 5 || item.urgencyLevel === "High")
+        .sort((a, b) => a.quantity - b.quantity),
+    [inventoryItems],
+  );
 
-    if (!trimmedName || !formData.quantity || !formData.price) {
-      setFormError("All fields are required.");
-      return;
-    }
+  const totalInventoryValue = useMemo(
+    () => inventoryItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0),
+    [inventoryItems],
+  );
 
-    if (quantity <= 0) {
-      setFormError("Quantity must be greater than 0.");
-      return;
-    }
-
-    if (price <= 0) {
-      setFormError("Price must be greater than 0.");
-      return;
-    }
-
-    setFormError("");
-
-    if (editingItemId) {
-      const updatedItems = items.map((item) =>
-        item.id === editingItemId
-          ? { ...item, name: trimmedName, quantity, price }
-          : item
-      );
-      persistItems(updatedItems);
-      setSelectedItemId(editingItemId);
-      setEditingItemId(null);
-      setFormData(emptyForm);
-      return;
-    }
-
-    const newItem: InventoryItem = {
-      id: Date.now(),
-      name: trimmedName,
-      quantity,
-      price,
-      createdAt: new Date().toLocaleString(),
-    };
-
-    persistItems([newItem, ...items]);
-    setSelectedItemId(newItem.id);
+  const resetForm = () => {
     setFormData(emptyForm);
+    setEditingItemId(null);
+    setFormError("");
   };
 
   const startEdit = (item: InventoryItem) => {
-    setEditingItemId(item.id);
+    setEditingItemId(item.itemID);
     setFormData({
-      name: item.name,
+      itemName: item.itemName,
+      category: item.category,
+      unitPrice: String(item.unitPrice),
       quantity: String(item.quantity),
-      price: String(item.price),
+      urgencyLevel: item.urgencyLevel,
     });
     setFormError("");
+    setStatusMessage("");
   };
 
-  const deleteItem = (itemId: number) => {
-    const targetItem = items.find((item) => item.id === itemId);
-    if (!targetItem) return;
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setFormError("");
+    setStatusMessage("");
 
-    const confirmed = window.confirm(`Delete ${targetItem.name}? This cannot be undone.`);
-    if (!confirmed) return;
+    const itemName = formData.itemName.trim();
+    const category = formData.category.trim();
+    const unitPrice = Number(formData.unitPrice);
+    const quantity = Number(formData.quantity);
 
-    const remainingItems = items.filter((item) => item.id !== itemId);
-    persistItems(remainingItems);
-
-    if (editingItemId === itemId) {
-      setEditingItemId(null);
-      setFormData(emptyForm);
-      setFormError("");
+    if (!itemName || !category) {
+      setFormError("Item name and category are required.");
+      return;
     }
 
-    setSelectedItemId((prev) => (prev === itemId ? remainingItems[0]?.id ?? null : prev));
+    if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+      setFormError("Unit price must be a valid number greater than or equal to 0.");
+      return;
+    }
+
+    if (!Number.isInteger(quantity) || quantity < 0) {
+      setFormError("Quantity must be a whole number greater than or equal to 0.");
+      return;
+    }
+
+    if (editingItemId) {
+      updateInventoryItem(editingItemId, {
+        itemName,
+        category,
+        unitPrice,
+        quantity,
+        urgencyLevel: formData.urgencyLevel,
+      });
+      setSelectedItemId(editingItemId);
+      setStatusMessage("Inventory item updated.");
+      resetForm();
+      return;
+    }
+
+    const newItem = createInventoryItem({
+      itemName,
+      category,
+      unitPrice,
+      quantity,
+      urgencyLevel: formData.urgencyLevel,
+    });
+    setSelectedItemId(newItem.itemID);
+    setStatusMessage("Inventory item created.");
+    resetForm();
   };
 
-  const cancelEdit = () => {
-    setEditingItemId(null);
-    setFormData(emptyForm);
+  const handleDeleteItem = (itemID: string) => {
+    const targetItem = inventoryItems.find((item) => item.itemID === itemID);
+    if (!targetItem) {
+      setFormError("Inventory item not found.");
+      return;
+    }
+
+    const confirmed = window.confirm(`Delete ${targetItem.itemName}? This cannot be undone.`);
+    if (!confirmed) {
+      return;
+    }
+
+    const remainingItems = inventoryItems.filter((item) => item.itemID !== itemID);
+    deleteInventoryItem(itemID);
     setFormError("");
+    setStatusMessage("Inventory item deleted.");
+
+    if (selectedItemId === itemID) {
+      setSelectedItemId(remainingItems[0]?.itemID ?? null);
+    }
+
+    if (editingItemId === itemID) {
+      resetForm();
+    }
   };
 
   return (
     <>
       <Header />
-      <div className="min-h-screen bg-[radial-gradient(circle_at_top_right,_rgba(6,95,70,0.5),_transparent_55%),linear-gradient(120deg,_#111827_0%,_#1f2937_35%,_#0f172a_100%)]">
+      <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(190,24,93,0.35),_transparent_55%),linear-gradient(120deg,_#111827_0%,_#1f2937_40%,_#0f172a_100%)]">
         <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-8 text-white md:px-8">
-          {/* Header Section */}
           <section className="rounded-2xl border border-white/15 bg-black/45 p-5 backdrop-blur-sm">
-            <h1 className="text-3xl font-bold">Inventory Management</h1>
+            <h1 className="text-3xl font-bold">Inventory Records</h1>
             <p className="mt-1 text-sm text-white/70">
-              Track stock levels, monitor item prices, and manage your product catalog.
+              Manage stock levels, item urgency, and inventory value using frontend-only JSON
+              seeded storage.
             </p>
 
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
               <input
                 type="text"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search inventory by name..."
-                className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 outline-none ring-emerald-300 transition focus:ring-2"
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Search by item name, category, or ID"
+                className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 outline-none ring-pink-300 transition focus:ring-2"
               />
 
               <select
+                value={categoryFilter}
+                onChange={(event) => setCategoryFilter(event.target.value)}
+                className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 outline-none ring-pink-300 transition focus:ring-2"
+              >
+                {categoryOptions.map((category) => (
+                  <option key={category} value={category}>
+                    {category === "all" ? "Filter: All Categories" : `Category: ${category}`}
+                  </option>
+                ))}
+              </select>
+
+              <select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-                className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 outline-none ring-emerald-300 transition focus:ring-2"
+                onChange={(event) => setSortBy(event.target.value as SortBy)}
+                className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 outline-none ring-pink-300 transition focus:ring-2"
               >
                 <option value="name-asc">Sort: Name A-Z</option>
-                <option value="quantity-high">Sort: Quantity (High to Low)</option>
-                <option value="price-high">Sort: Price (High to Low)</option>
+                <option value="quantity-low">Sort: Quantity Low-High</option>
+                <option value="quantity-high">Sort: Quantity High-Low</option>
+                <option value="value-high">Sort: Value High-Low</option>
+                <option value="recent">Sort: Recently Updated</option>
               </select>
             </div>
+
+            <p className="mt-4 text-sm text-white/75">
+              Total Inventory Value:{" "}
+              <span className="font-semibold text-white">
+                {totalInventoryValue.toLocaleString("en-PH", {
+                  style: "currency",
+                  currency: "PHP",
+                })}
+              </span>
+            </p>
           </section>
 
-          <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
-            {/* List View Section */}
+          <main className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
             <section className="rounded-2xl border border-white/15 bg-black/45 p-5 backdrop-blur-sm">
-              <h2 className="text-xl font-semibold">Inventory List</h2>
-              <p className="mt-1 text-sm text-white/70">
-                {isLoading ? "Loading inventory..." : `${filteredItems.length} item(s) in stock`}
-              </p>
+              <h2 className="text-xl font-semibold">Record List View</h2>
+              <p className="mt-1 text-sm text-white/70">{filteredItems.length} inventory item(s)</p>
 
-              <div className="mt-4 space-y-3 max-h-[500px] overflow-y-auto pr-2">
+              <div className="mt-4 space-y-3">
                 {filteredItems.map((item) => (
                   <article
-                    key={item.id}
-                    className="rounded-xl border border-white/10 bg-white/5 p-4 shadow-sm transition hover:bg-white/10"
+                    key={item.itemID}
+                    className="rounded-xl border border-white/10 bg-white/5 p-4 shadow-sm"
                   >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="text-lg font-semibold">{item.name}</p>
-                        <p className="text-sm text-white/75">Qty: {item.quantity}</p>
-                        <p className="text-sm text-white/75">
-                          ₱{item.price.toLocaleString()}
-                        </p>
-                        <p className="text-xs text-white/50 mt-1">Added: {item.createdAt}</p>
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedItemId(item.id)}
-                          className="rounded-md bg-sky-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-400"
-                        >
-                          View
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => startEdit(item)}
-                          className="rounded-md bg-amber-500 px-3 py-1.5 text-sm font-medium text-black hover:bg-amber-400"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => deleteItem(item.id)}
-                          className="rounded-md bg-rose-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-rose-500"
-                        >
-                          Delete
-                        </button>
-                      </div>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-lg font-semibold">{item.itemName}</p>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs ${urgencyBadgeClasses[item.urgencyLevel]}`}
+                      >
+                        {item.urgencyLevel} Urgency
+                      </span>
+                    </div>
+                    <p className="text-sm text-white/75">Category: {item.category}</p>
+                    <p className="text-sm text-white/75">Quantity: {item.quantity}</p>
+                    <p className="text-sm text-white/75">
+                      Unit Price:{" "}
+                      {item.unitPrice.toLocaleString("en-PH", {
+                        style: "currency",
+                        currency: "PHP",
+                      })}
+                    </p>
+                    <p className="text-sm text-white/60">Item ID: {item.itemID}</p>
+
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedItemId(item.itemID)}
+                        className="rounded-md bg-sky-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-400"
+                      >
+                        View
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => startEdit(item)}
+                        className="rounded-md bg-amber-500 px-3 py-1.5 text-sm font-medium text-black hover:bg-amber-400"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteItem(item.itemID)}
+                        className="rounded-md bg-rose-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-rose-500"
+                      >
+                        Delete
+                      </button>
                     </div>
                   </article>
                 ))}
 
                 {filteredItems.length === 0 && (
                   <p className="rounded-xl border border-dashed border-white/25 p-5 text-center text-white/70">
-                    No items found. Add your first inventory item!
+                    No inventory records match your filters.
                   </p>
                 )}
               </div>
             </section>
 
-            <div className="space-y-6">
-              {/* Form Section */}
+            <section className="space-y-6">
               <form
                 onSubmit={handleSubmit}
                 className="rounded-2xl border border-white/15 bg-black/45 p-5 backdrop-blur-sm"
               >
                 <h2 className="text-xl font-semibold">
-                  {editingItemId ? "Edit Item" : "Add New Item"}
+                  {editingItemId ? "Edit Inventory Item" : "Create Inventory Item"}
                 </h2>
 
                 <div className="mt-4 space-y-3">
@@ -248,12 +346,37 @@ export default function InventoryPage() {
                     Item Name
                     <input
                       type="text"
-                      value={formData.name}
-                      onChange={(e) =>
-                        setFormData((prev) => ({ ...prev, name: e.target.value }))
+                      value={formData.itemName}
+                      onChange={(event) =>
+                        setFormData((previous) => ({ ...previous, itemName: event.target.value }))
                       }
-                      placeholder="e.g., Hair Clippers, Shampoo, Scissors"
-                      className="mt-1 w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 outline-none ring-emerald-300 transition focus:ring-2"
+                      className="mt-1 w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 outline-none ring-pink-300 transition focus:ring-2"
+                    />
+                  </label>
+
+                  <label className="block text-sm">
+                    Category
+                    <input
+                      type="text"
+                      value={formData.category}
+                      onChange={(event) =>
+                        setFormData((previous) => ({ ...previous, category: event.target.value }))
+                      }
+                      className="mt-1 w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 outline-none ring-pink-300 transition focus:ring-2"
+                    />
+                  </label>
+
+                  <label className="block text-sm">
+                    Unit Price
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={formData.unitPrice}
+                      onChange={(event) =>
+                        setFormData((previous) => ({ ...previous, unitPrice: event.target.value }))
+                      }
+                      className="mt-1 w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 outline-none ring-pink-300 transition focus:ring-2"
                     />
                   </label>
 
@@ -262,44 +385,50 @@ export default function InventoryPage() {
                     <input
                       type="number"
                       min="0"
+                      step="1"
                       value={formData.quantity}
-                      onChange={(e) =>
-                        setFormData((prev) => ({ ...prev, quantity: e.target.value }))
+                      onChange={(event) =>
+                        setFormData((previous) => ({ ...previous, quantity: event.target.value }))
                       }
-                      placeholder="0"
-                      className="mt-1 w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 outline-none ring-emerald-300 transition focus:ring-2"
+                      className="mt-1 w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 outline-none ring-pink-300 transition focus:ring-2"
                     />
                   </label>
 
                   <label className="block text-sm">
-                    Price (₱)
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={formData.price}
-                      onChange={(e) =>
-                        setFormData((prev) => ({ ...prev, price: e.target.value }))
+                    Urgency Level
+                    <select
+                      value={formData.urgencyLevel}
+                      onChange={(event) =>
+                        setFormData((previous) => ({
+                          ...previous,
+                          urgencyLevel: event.target.value as UrgencyLevel,
+                        }))
                       }
-                      placeholder="0.00"
-                      className="mt-1 w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 outline-none ring-emerald-300 transition focus:ring-2"
-                    />
+                      className="mt-1 w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 outline-none ring-pink-300 transition focus:ring-2"
+                    >
+                      {URGENCY_LEVELS.map((level) => (
+                        <option key={level} value={level}>
+                          {level}
+                        </option>
+                      ))}
+                    </select>
                   </label>
                 </div>
 
-                {formError && <p className="mt-3 text-sm text-red-300">{formError}</p>}
+                {formError && <p className="mt-3 text-sm text-rose-200">{formError}</p>}
+                {statusMessage && <p className="mt-3 text-sm text-emerald-200">{statusMessage}</p>}
 
                 <div className="mt-4 flex gap-2">
                   <button
                     type="submit"
                     className="rounded-md bg-emerald-500 px-4 py-2 font-semibold text-black hover:bg-emerald-400"
                   >
-                    {editingItemId ? "Save Changes" : "Add Item"}
+                    {editingItemId ? "Save Changes" : "Add Inventory Item"}
                   </button>
                   {editingItemId && (
                     <button
                       type="button"
-                      onClick={cancelEdit}
+                      onClick={resetForm}
                       className="rounded-md border border-white/30 px-4 py-2 font-semibold text-white hover:bg-white/10"
                     >
                       Cancel
@@ -308,52 +437,84 @@ export default function InventoryPage() {
                 </div>
               </form>
 
-              {/* Detail View Section */}
               <article className="rounded-2xl border border-white/15 bg-black/45 p-5 backdrop-blur-sm">
-                <h2 className="text-xl font-semibold">Item Details</h2>
+                <h2 className="text-xl font-semibold">Inventory Detail View</h2>
 
                 {selectedItem ? (
                   <div className="mt-3 space-y-2 text-sm">
                     <p>
-                      <span className="font-semibold text-white/85">Name:</span> {selectedItem.name}
+                      <span className="font-semibold text-white/85">Item Name:</span>{" "}
+                      {selectedItem.itemName}
                     </p>
                     <p>
-                      <span className="font-semibold text-white/85">Quantity:</span> {selectedItem.quantity}
+                      <span className="font-semibold text-white/85">Category:</span>{" "}
+                      {selectedItem.category}
                     </p>
                     <p>
-                      <span className="font-semibold text-white/85">Price:</span> ₱{selectedItem.price.toLocaleString()}
+                      <span className="font-semibold text-white/85">Quantity:</span>{" "}
+                      {selectedItem.quantity}
                     </p>
                     <p>
-                      <span className="font-semibold text-white/85">Total Value:</span> ₱{(selectedItem.quantity * selectedItem.price).toLocaleString()}
+                      <span className="font-semibold text-white/85">Unit Price:</span>{" "}
+                      {selectedItem.unitPrice.toLocaleString("en-PH", {
+                        style: "currency",
+                        currency: "PHP",
+                      })}
                     </p>
                     <p>
-                      <span className="font-semibold text-white/85">Item ID:</span> {selectedItem.id}
+                      <span className="font-semibold text-white/85">Stock Value:</span>{" "}
+                      {(selectedItem.unitPrice * selectedItem.quantity).toLocaleString("en-PH", {
+                        style: "currency",
+                        currency: "PHP",
+                      })}
                     </p>
                     <p>
-                      <span className="font-semibold text-white/85">Date Added:</span> {selectedItem.createdAt}
+                      <span className="font-semibold text-white/85">Urgency:</span>{" "}
+                      {selectedItem.urgencyLevel}
                     </p>
-                    <button
-                      type="button"
-                      onClick={() => deleteItem(selectedItem.id)}
-                      className="mt-2 rounded-md bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-600"
-                    >
-                      Delete This Item
-                    </button>
+                    <p>
+                      <span className="font-semibold text-white/85">Item ID:</span>{" "}
+                      {selectedItem.itemID}
+                    </p>
+                    <p>
+                      <span className="font-semibold text-white/85">Last Updated:</span>{" "}
+                      {new Date(selectedItem.updatedAt).toLocaleString()}
+                    </p>
                   </div>
                 ) : (
-                  <p className="mt-3 text-sm text-white/70">
-                    Select an item from the list to view full details.
-                  </p>
+                  <p className="mt-3 text-sm text-white/70">Select an inventory item to view details.</p>
                 )}
               </article>
-            </div>
-          </div>
-        </div>
 
-        <div className="mx-auto max-w-6xl px-4 pb-8 md:px-8">
-          <Link href="/" className="text-sm text-white/80 hover:text-white">
-            ← Back to Dashboard
-          </Link>
+              <article className="rounded-2xl border border-white/15 bg-black/45 p-5 backdrop-blur-sm">
+                <h2 className="text-xl font-semibold">Stock Notifications</h2>
+                <p className="mt-1 text-sm text-white/70">
+                  Items with quantity ≤ 5 or marked as High urgency.
+                </p>
+
+                <div className="mt-3 space-y-2">
+                  {lowStockItems.map((item) => (
+                    <div
+                      key={`notification-${item.itemID}`}
+                      className="rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-sm"
+                    >
+                      <p className="font-semibold text-rose-200">{item.itemName}</p>
+                      <p className="text-rose-100/90">
+                        Qty: {item.quantity} • Urgency: {item.urgencyLevel}
+                      </p>
+                    </div>
+                  ))}
+
+                  {lowStockItems.length === 0 && (
+                    <p className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-200">
+                      No active low-stock notifications.
+                    </p>
+                  )}
+                </div>
+              </article>
+            </section>
+          </main>
+
         </div>
       </div>
     </>

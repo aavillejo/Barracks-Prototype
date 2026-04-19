@@ -2,10 +2,13 @@
 
 import { FormEvent, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 
 export default function LoginPage() {
+    // Note: Though the demos show sample passwords, there's no verification process, just put fuckall bro
+
+    // Trinidad Part
     const searchParams = useSearchParams();
-    const from = searchParams.get("from") || "/Display/LandingPage";
 
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
@@ -15,38 +18,11 @@ export default function LoginPage() {
     async function handleSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
         setError("");
-
-        if (!username.trim() || !password) {
-            setError("Please enter both username and password.");
-            return;
-        }
-
         setIsSubmitting(true);
 
-        try {
-            const response = await fetch("/api/auth/login", {
-                method: "POST",
-                credentials: "include",
-                cache: "no-store",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ username, password }),
-            });
-
-            const data = (await response.json()) as { message?: string };
-
-            if (!response.ok) {
-                setError(data.message || "Login failed.");
-                return;
-            }
-
-            window.location.assign(from);
-        } catch {
-            setError("Could not connect to the server. Please try again.");
-        } finally {
-            setIsSubmitting(false);
-        }
+        setTimeout(() => {
+            window.location.assign("/Display/LandingPage");
+        }, 500);
     }
 
     return (
@@ -83,9 +59,15 @@ export default function LoginPage() {
                 </button>
             </form>
 
+            <p className="w-full rounded-lg bg-gray-950 px-4 py-2 mt-2 flex justify-center font-semibold text-white transition hover:bg-gray-800 disabled:opacity-70">
+                <Link href="/Display/LandingPage">
+                    Proceed without Logging In
+                </Link>
+            </p>
             <p className="mt-4 text-center text-xs text-gray-200">
                 Demo account: <span className="font-semibold">admin</span> / <span className="font-semibold">barracks123</span>
             </p>
+
         </div>
     );
 }

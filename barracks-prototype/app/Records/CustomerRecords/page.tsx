@@ -1,16 +1,9 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import Link from "next/link";
 import Header from "@/app/Display/Header";
-
-type Customer = {
-  id: string;
-  name: string;
-  email: string;
-  contactNumber: string;
-  createdAt: string;
-};
+import { useCustomerStorage, type Customer } from "@/app/Records/DataPersistence/Storage";
 
 type CustomerForm = {
   name: string;
@@ -25,38 +18,13 @@ const emptyForm: CustomerForm = {
 };
 
 export default function CustomerRecordsPage() {
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const { customers, createCustomer, updateCustomer, deleteCustomer } = useCustomerStorage();
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<"name-asc" | "name-desc" | "recent">("name-asc");
   const [formData, setFormData] = useState<CustomerForm>(emptyForm);
   const [formError, setFormError] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    async function loadCustomers() {
-      try {
-        const response = await fetch("/api/customers", { cache: "no-store" });
-        if (!response.ok) {
-          throw new Error("Failed to load customers.");
-        }
-
-        const data = (await response.json()) as Customer[];
-        setCustomers(data);
-      } catch {
-        setFormError("Could not load customer records.");
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    void loadCustomers();
-  }, []);
-
-  const persistCustomers = (updatedCustomers: Customer[]) => {
-    setCustomers(updatedCustomers);
-  };
 
   const filteredCustomers = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -81,7 +49,7 @@ export default function CustomerRecordsPage() {
   const selectedCustomer =
     customers.find((customer) => customer.id === selectedCustomerId) ?? customers[0] ?? null;
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     const trimmedName = formData.name.trim();
@@ -106,51 +74,25 @@ export default function CustomerRecordsPage() {
     setFormError("");
 
     if (editingCustomerId) {
-      const updatedCustomers = customers.map((customer) =>
-        customer.id === editingCustomerId
-          ? {
-              ...customer,
-              name: trimmedName,
-              email: trimmedEmail,
-              contactNumber: trimmedContactNumber,
-            }
-          : customer,
-      );
-
-      persistCustomers(updatedCustomers);
+      updateCustomer(editingCustomerId, {
+        name: trimmedName,
+        email: trimmedEmail,
+        contactNumber: trimmedContactNumber,
+      });
       setSelectedCustomerId(editingCustomerId);
       setEditingCustomerId(null);
       setFormData(emptyForm);
       return;
     }
 
-    try {
-      const response = await fetch("/api/customers", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: trimmedName,
-          email: trimmedEmail,
-          contactNumber: trimmedContactNumber,
-        }),
-      });
+    const newCustomer = createCustomer({
+      name: trimmedName,
+      email: trimmedEmail,
+      contactNumber: trimmedContactNumber,
+    });
 
-      const data = (await response.json()) as Customer | { message?: string };
-
-      if (!response.ok) {
-        setFormError((data as { message?: string }).message ?? "Could not create customer.");
-        return;
-      }
-
-      const createdCustomer = data as Customer;
-      persistCustomers([createdCustomer, ...customers]);
-      setSelectedCustomerId(createdCustomer.id);
-      setFormData(emptyForm);
-    } catch {
-      setFormError("Could not create customer.");
-    }
+    setSelectedCustomerId(newCustomer.id);
+    setFormData(emptyForm);
   };
 
   const startEdit = (customer: Customer) => {
@@ -163,7 +105,7 @@ export default function CustomerRecordsPage() {
     setFormError("");
   };
 
-  const deleteCustomer = (customerId: string) => {
+  const handleDeleteCustomer = (customerId: string) => {
     const targetCustomer = customers.find((customer) => customer.id === customerId);
 
     if (!targetCustomer) {
@@ -175,8 +117,7 @@ export default function CustomerRecordsPage() {
       return;
     }
 
-    const remainingCustomers = customers.filter((customer) => customer.id !== customerId);
-    persistCustomers(remainingCustomers);
+    deleteCustomer(customerId);
 
     if (editingCustomerId === customerId) {
       setEditingCustomerId(null);
@@ -184,9 +125,10 @@ export default function CustomerRecordsPage() {
       setFormError("");
     }
 
-    setSelectedCustomerId((previous) =>
-      previous === customerId ? remainingCustomers[0]?.id ?? null : previous,
-    );
+    setSelectedCustomerId((previous) => {
+      const updatedCustomers = customers.filter((customer) => customer.id !== customerId);
+      return previous === customerId ? updatedCustomers[0]?.id ?? null : previous;
+    });
   };
 
   const cancelEdit = () => {
@@ -227,12 +169,10 @@ export default function CustomerRecordsPage() {
             </div>
           </section>
 
-          <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
+          <main className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
             <section className="rounded-2xl border border-white/15 bg-black/45 p-5 backdrop-blur-sm">
               <h2 className="text-xl font-semibold">Record List View</h2>
-              <p className="mt-1 text-sm text-white/70">
-                {isLoading ? "Loading customer records..." : `${filteredCustomers.length} customer record(s)`}
-              </p>
+              <p className="mt-1 text-sm text-white/70">{filteredCustomers.length} customer record(s)</p>
 
               <div className="mt-4 space-y-3">
                 {filteredCustomers.map((customer) => (
@@ -260,7 +200,7 @@ export default function CustomerRecordsPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => deleteCustomer(customer.id)}
+                        onClick={() => handleDeleteCustomer(customer.id)}
                         className="rounded-md bg-rose-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-rose-500"
                       >
                         Delete
@@ -371,26 +311,69 @@ export default function CustomerRecordsPage() {
                     </p>
                     <button
                       type="button"
-                      onClick={() => deleteCustomer(selectedCustomer.id)}
+                      onClick={() => handleDeleteCustomer(selectedCustomer.id)}
                       className="mt-2 rounded-md bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-600"
                     >
                       Delete This Customer
                     </button>
                   </div>
                 ) : (
-                  <p className="mt-3 text-sm text-white/70">Select a customer to view full info.</p>
+                  <p className="mt-3 text-sm text-white/60">Select a customer to view details.</p>
                 )}
               </article>
             </section>
-          </div>
-        </div>
-
-        <div className="mx-auto max-w-6xl px-4 pb-8 md:px-8">
-          <Link href="/Display/LandingPage" className="text-sm text-white/80 hover:text-white">
-            Back to Dashboard
-          </Link>
+          </main>
         </div>
       </div>
     </>
   );
 }
+
+/*
+
+// NEW UNIFIED INTERFACE - PeerReview branch implementation
+import PageInterface from "../PageInterface";
+import { Network } from "lucide-react";
+
+const sampleCustomers = [
+  {
+    "id": "cust-1001",
+    "name": "Alyssa Rivera",
+    "email": "alyssa.rivera@email.com",
+    "contactNumber": "+63 917 555 0111",
+    "createdAt": "2026-01-18T10:22:00.000Z"
+  },
+  {
+    "id": "cust-1002",
+    "name": "Marc Tan",
+    "email": "marc.tan@email.com",
+    "contactNumber": "+63 917 555 0142",
+    "createdAt": "2026-02-04T13:45:00.000Z"
+  },
+  {
+    "id": "cust-1003",
+    "name": "Jessa Lim",
+    "email": "jessa.lim@email.com",
+    "contactNumber": "+63 917 555 0188",
+    "createdAt": "2026-03-01T08:10:00.000Z"
+  }
+];
+
+export default function CustomerRecordsPage() {
+  return (
+    <PageInterface
+      title="Customer Records"
+      description="Browse, search, and manage all customer records"
+      icon={<Network size={24} />}
+      color="pink"
+      records={sampleCustomers}
+      totalLabel="All Items"
+      onAdd={() => console.log("Add item")}
+      onView={(id) => console.log("View item", id)}
+      onEdit={(id) => console.log("Edit item", id)}
+      onDelete={(id) => console.log("Delete item", id)}
+    />
+  );
+}
+
+*/
