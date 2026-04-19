@@ -2,7 +2,13 @@
 
 import { useEffect, useState } from "react";
 import seedCustomers from "@/app/data/customers.json";
+import seedInventory from "@/app/data/inventory.json";
 import seedStaff from "@/app/data/staff.json";
+import {
+  type InventoryItem,
+  type UrgencyLevel,
+  isInventoryItem,
+} from "@/app/lib/inventory-types";
 
 // ==================== cuhs ====================
 
@@ -239,5 +245,108 @@ export const useStaffStorage = () => {
     createStaff,
     updateStaff,
     deleteStaff,
+  };
+};
+
+// ==================== inventory ====================
+
+const getInitialInventory = (storageKey: string): InventoryItem[] => {
+  if (typeof window === "undefined") {
+    return (seedInventory as InventoryItem[]).map((item) => ({ ...item }));
+  }
+
+  const storedRecords = window.localStorage.getItem(storageKey);
+
+  if (!storedRecords) {
+    return (seedInventory as InventoryItem[]).map((item) => ({ ...item }));
+  }
+
+  try {
+    const parsed = JSON.parse(storedRecords) as unknown;
+
+    if (Array.isArray(parsed) && parsed.every(isInventoryItem)) {
+      return parsed;
+    }
+
+    const fallback = (seedInventory as InventoryItem[]).map((item) => ({ ...item }));
+    window.localStorage.setItem(storageKey, JSON.stringify(fallback));
+    return fallback;
+  } catch {
+    const fallback = (seedInventory as InventoryItem[]).map((item) => ({ ...item }));
+    window.localStorage.setItem(storageKey, JSON.stringify(fallback));
+    return fallback;
+  }
+};
+
+export const useInventoryStorage = () => {
+  const STORAGE_KEY = "barracks.inventory.records";
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>(() =>
+    getInitialInventory(STORAGE_KEY),
+  );
+
+  useEffect(() => {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(inventoryItems));
+  }, [inventoryItems]);
+
+  const createInventoryItem = (formData: {
+    itemName: string;
+    category: string;
+    unitPrice: number;
+    quantity: number;
+    urgencyLevel: UrgencyLevel;
+  }): InventoryItem => {
+    const now = new Date().toISOString();
+    const newItem: InventoryItem = {
+      itemID: `item-${Date.now()}`,
+      itemName: formData.itemName,
+      category: formData.category,
+      unitPrice: formData.unitPrice,
+      quantity: formData.quantity,
+      urgencyLevel: formData.urgencyLevel,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    setInventoryItems((prev) => [newItem, ...prev]);
+    return newItem;
+  };
+
+  const updateInventoryItem = (
+    itemID: string,
+    formData: {
+      itemName: string;
+      category: string;
+      unitPrice: number;
+      quantity: number;
+      urgencyLevel: UrgencyLevel;
+    },
+  ) => {
+    const now = new Date().toISOString();
+    setInventoryItems((prev) =>
+      prev.map((item) =>
+        item.itemID === itemID
+          ? {
+              ...item,
+              itemName: formData.itemName,
+              category: formData.category,
+              unitPrice: formData.unitPrice,
+              quantity: formData.quantity,
+              urgencyLevel: formData.urgencyLevel,
+              updatedAt: now,
+            }
+          : item,
+      ),
+    );
+  };
+
+  const deleteInventoryItem = (itemID: string) => {
+    setInventoryItems((prev) => prev.filter((item) => item.itemID !== itemID));
+  };
+
+  return {
+    inventoryItems,
+    createInventoryItem,
+    updateInventoryItem,
+    deleteInventoryItem,
   };
 };

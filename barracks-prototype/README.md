@@ -52,6 +52,6 @@ app/
 
 ## Recent Implementations
 
-- All Frontend Pages except for Inventory
-- Minimalist and Cleaner concept for Record Pages.
-- localStorage Addition
+- Inventory page now supports frontend-only JSON-seeded CRUD (create, view, edit, delete) with localStorage persistence.
+- Stock notification section for low-quantity and high-urgency items.
+- Minimalist and cleaner concept for record pages.
